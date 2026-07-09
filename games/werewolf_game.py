@@ -16,9 +16,9 @@ class WerewolfGame:
     def __init__(self, chat_id):
         self.chat_id = chat_id
         self.game_id = f"werewolf_{chat_id}"
-        self.players = {}  # {user_id: role}
+        self.players = {}
         self.alive = []
-        self.phase = "waiting"  # waiting, night, day
+        self.phase = "waiting"
         self.night_actions = {}
         self.started = False
         self._load()
@@ -26,23 +26,26 @@ class WerewolfGame:
     def _load(self):
         data = db.get_game(self.game_id)
         if data:
-            self.__dict__.update(data)
+            self.players = {int(k): v for k, v in data.get("players", {}).items()}
+            self.alive = [int(x) for x in data.get("alive", [])]
+            self.phase = data.get("phase", "waiting")
+            self.night_actions = data.get("night_actions", {})
+            self.started = data.get("started", False)
             
     def _save(self):
+        players_data = {str(k): v for k, v in self.players.items()}
+        alive_data = [str(x) for x in self.alive]
         db.save_game(self.game_id, "werewolf", {
-            "players": self.players,
-            "alive": self.alive,
+            "players": players_data,
+            "alive": alive_data,
             "phase": self.phase,
             "night_actions": self.night_actions,
             "started": self.started
         })
         
     def assign_roles(self, user_ids):
-        """အလုပ်တွေခွဲပေးမယ်"""
         n = len(user_ids)
         roles = []
-        
-        # လူဦးရေအလိုက် ဝံပုလွေအရေအတွက်
         werewolf_count = max(1, n // 4)
         
         roles.extend(["werewolf"] * werewolf_count)
@@ -51,8 +54,6 @@ class WerewolfGame:
             roles.append("doctor")
         if n >= 8:
             roles.append("hunter")
-            
-        # ကျန်တာရွာသား
         roles.extend(["villager"] * (n - len(roles)))
         random.shuffle(roles)
         
@@ -60,12 +61,10 @@ class WerewolfGame:
         self.alive = user_ids.copy()
         self.started = True
         self.phase = "night"
-        
         self._save()
         return self.players
         
     def night_action(self, user_id, target_id):
-        """ညဘက်လုပ်ဆောင်ချက်"""
         if self.phase != "night":
             return "ညဘက်မဟုတ်သေးဘူး"
             
@@ -76,12 +75,13 @@ class WerewolfGame:
             self.night_actions["seer"] = target_id
         elif role == "doctor":
             self.night_actions["save"] = target_id
+        else:
+            return "မင်းဒီလုပ်ဆောင်ချက်မလုပ်နိုင်ဘူး"
             
         self._save()
         return f"{self.ROLES[role]} action လုပ်ပြီး"
         
     def resolve_night(self):
-        """ညဘက်ကိစ္စအကုန်ဖြေရှင်းမယ်"""
         if self.phase != "night":
             return "ညဘက်မဟုတ်ဘူး"
             
@@ -91,12 +91,10 @@ class WerewolfGame:
         
         msg = ""
         
-        # ဗေဒင်ကြည့်တယ်
         if seer_target and seer_target in self.players:
             role = self.players[seer_target]
             msg += f"🔮 {seer_target} က {self.ROLES[role]} ဖြစ်တယ်\n"
             
-        # သေမယ့်သူ
         if kill_target and kill_target != save_target:
             if kill_target in self.alive:
                 self.alive.remove(kill_target)
@@ -108,7 +106,6 @@ class WerewolfGame:
         self.night_actions = {}
         self._save()
         
-        # အနိုင်ရရင်
         alive_roles = [self.players[uid] for uid in self.alive]
         if "werewolf" not in alive_roles:
             self.started = False
@@ -120,7 +117,6 @@ class WerewolfGame:
         return msg
         
     def vote(self, user_id, target_id):
-        """မဲပေးမယ် (နေ့ဘက်)"""
         if self.phase != "day":
             return "မဲပေးချိန်မဟုတ်ဘူး"
             
