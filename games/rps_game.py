@@ -18,12 +18,16 @@ class RPSGame:
     def _load(self):
         data = db.get_game(self.game_id)
         if data:
-            self.__dict__.update(data)
+            self.players = {int(k): v for k, v in data.get("players", {}).items()}
+            self.choices = {int(k): v for k, v in data.get("choices", {}).items()}
+            self.started = data.get("started", False)
             
     def _save(self):
+        players_data = {str(k): v for k, v in self.players.items()}
+        choices_data = {str(k): v for k, v in self.choices.items()}
         db.save_game(self.game_id, "rps", {
-            "players": self.players,
-            "choices": self.choices,
+            "players": players_data,
+            "choices": choices_data,
             "started": self.started
         })
         
