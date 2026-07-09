@@ -20,15 +20,21 @@ class HangmanGame:
     def _load(self):
         data = db.get_game(self.game_id)
         if data:
-            self.__dict__.update(data)
+            self.word = data.get("word", "")
+            self.display = data.get("display", [])
+            self.guessed = data.get("guessed", [])
+            self.tries = data.get("tries", 6)
+            self.players = set([int(x) for x in data.get("players", [])])
+            self.started = data.get("started", False)
             
     def _save(self):
+        players_data = [str(x) for x in self.players]
         db.save_game(self.game_id, "hangman", {
             "word": self.word,
             "display": self.display,
             "guessed": self.guessed,
             "tries": self.tries,
-            "players": list(self.players),
+            "players": players_data,
             "started": self.started
         })
         
@@ -63,7 +69,6 @@ class HangmanGame:
             self.tries -= 1
             msg = f"❌ မှားတယ်! ကြိုးဆွဲထည့်လိုက်ပြီ...\n{' '.join(self.display)}\nအကြိမ် {self.tries} ကျန်တယ်"
             
-        # အနိုင်ရ/ရှုံး စစ်
         if "_" not in self.display:
             self.started = False
             msg += f"\n🎉 အနိုင်ရသွားပြီ! စကားလုံးက '{self.word}'"
