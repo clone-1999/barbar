@@ -18,7 +18,7 @@ class UnoGame:
         self.current_color = None
         self.current_value = None
         self.turn_index = 0
-        self.direction = 1  # 1 = clockwise, -1 = counter
+        self.direction = 1
         self.started = False
         self._load()
         
@@ -26,12 +26,20 @@ class UnoGame:
         """သိမ်းထားတဲ့ game state ပြန်ယူမယ်"""
         data = db.get_game(self.game_id)
         if data:
-            self.__dict__.update(data)
+            self.players = {int(k): v for k, v in data.get("players", {}).items()}
+            self.deck = data.get("deck", [])
+            self.discard_pile = data.get("discard_pile", [])
+            self.current_color = data.get("current_color")
+            self.current_value = data.get("current_value")
+            self.turn_index = data.get("turn_index", 0)
+            self.direction = data.get("direction", 1)
+            self.started = data.get("started", False)
             
     def _save(self):
         """Game state သိမ်းမယ်"""
+        players_data = {str(k): v for k, v in self.players.items()}
         db.save_game(self.game_id, "uno", {
-            "players": self.players,
+            "players": players_data,
             "deck": self.deck,
             "discard_pile": self.discard_pile,
             "current_color": self.current_color,
@@ -47,7 +55,7 @@ class UnoGame:
         for color in self.COLORS:
             for value in self.VALUES:
                 deck.append({"color": color, "value": value})
-                if value != "0":  # 0 က တစ်ကတ်ပဲရှိတယ်
+                if value != "0":
                     deck.append({"color": color, "value": value})
         for _ in range(4):
             deck.append({"color": "wild", "value": "wild"})
@@ -67,11 +75,9 @@ class UnoGame:
         self.turn_index = 0
         self.direction = 1
         
-        # ကတ်စပေးမယ် (၇ ကတ်စီ)
         for pid in player_ids:
             self.players[pid] = [self.deck.pop() for _ in range(7)]
             
-        # ပထမဆုံးကတ်ချမယ်
         first_card = self.deck.pop()
         while first_card["value"] in ["wild", "wild_draw4"]:
             self.deck.append(first_card)
@@ -104,7 +110,6 @@ class UnoGame:
         card = hand[card_index]
         top_card = self.discard_pile[-1]
         
-        # ကတ်ကစားလို့ရမရစစ်မယ်
         if card["color"] == "wild":
             if not chosen_color:
                 return "အရောင်ရွေးပါ"
@@ -116,11 +121,9 @@ class UnoGame:
         else:
             return "ဒီကတ်မကစားရဘူး"
             
-        # ကတ်ဖယ်ပြီး discard pile ထဲထည့်
         hand.pop(card_index)
         self.discard_pile.append(card)
         
-        # Special cards
         if card["value"] == "skip":
             self.turn_index = (self.turn_index + self.direction) % len(self.players)
         elif card["value"] == "reverse":
@@ -134,14 +137,12 @@ class UnoGame:
             for _ in range(4):
                 self.players[next_player].append(self.deck.pop())
                 
-        # အနိုင်ရရင်
         if len(hand) == 0:
             self.started = False
             db.update_score(user_id, "uno", 10)
             self._save()
             return f"🎉 {user_id} အနိုင်ရသွားပြီ!"
             
-        # နောက်လှည့်
         self.turn_index = (self.turn_index + self.direction) % len(self.players)
         self._save()
         return f"ကစားပြီး! နောက်လှည့်: {list(self.players.keys())[self.turn_index]}"
