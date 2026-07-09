@@ -22,18 +22,23 @@ class QuizGame:
     def _load(self):
         data = db.get_game(self.game_id)
         if data:
-            self.__dict__.update(data)
+            self.players = {int(k): v for k, v in data.get("players", {}).items()}
+            self.current_q = data.get("current_q", 0)
+            self.scores = {int(k): v for k, v in data.get("scores", {}).items()}
+            self.started = data.get("started", False)
             
     def _save(self):
+        players_data = {str(k): v for k, v in self.players.items()}
+        scores_data = {str(k): v for k, v in self.scores.items()}
         db.save_game(self.game_id, "quiz", {
-            "players": self.players,
+            "players": players_data,
             "current_q": self.current_q,
-            "scores": self.scores,
+            "scores": scores_data,
             "started": self.started
         })
         
     def start(self, user_ids):
-        self.players = {uid: False for uid in user_ids}  # False = not answered
+        self.players = {uid: False for uid in user_ids}
         self.scores = {uid: 0 for uid in user_ids}
         self.current_q = 0
         self.started = True
@@ -69,14 +74,13 @@ class QuizGame:
         correct = q_data["opts"].index(q_data["a"]) + 1
         
         if answer_idx == correct:
-            self.scores[user_id] += 1
+            self.scores[user_id] = self.scores.get(user_id, 0) + 1
             result = f"✅ {user_id} မှန်ပါတယ်! (+၁)"
         else:
             result = f"❌ {user_id} မှားပါတယ်။ အဖြေက {q_data['a']}"
             
         self.players[user_id] = True
         
-        # အားလုံးဖြေပြီးရင် နောက်မေးခွန်း
         if all(self.players.values()):
             self.current_q += 1
             for uid in self.players:
